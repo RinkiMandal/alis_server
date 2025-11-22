@@ -1,0 +1,7 @@
+node_modules
+.env
+flow.txt
+task.txt
+
+
+uploads/
