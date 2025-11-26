@@ -84,18 +84,7 @@ const ProductSchema = new Schema(
     simplePrice: SimplePriceSchema,    // Used ONLY IF isCake = false
 
     /** Extra sections */
-    careInstructions: { type: String, trim: true },
-
-    manufactureDetails: {
-      manufacturedBy: { type: String, trim: true },
-      address: { type: String, trim: true },
-      fssaiLicense: { type: String, trim: true },
-      customerSupport: {
-        email: { type: String, trim: true },
-        phone: { type: String, trim: true },
-      },
-      note: { type: String, trim: true },
-    },
+    careInstructions: [{ type: String, trim: true }],
 
     /** Product Images */
     images: {

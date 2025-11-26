@@ -50,6 +50,7 @@ export const productController = {
     return sendSuccess(res, weight, "weight list fetched successfully");
   },
 
+  // controller method
   async addProduct(req, res) {
     const {
       productName,
@@ -58,57 +59,123 @@ export const productController = {
       collectionId,
       orderType,
       variants,
+      simplePrice,
       careInstructions,
-      manufactureDetails,
       isCake,
       isNewest,
       isActive,
       dietaryType,
     } = req.body;
 
-    // ========= Validation =========
+    // 1️⃣ BASIC REQUIRED FIELDS
     if (!productName || !categoryId || !orderType) {
       return res.status(400).json({
         success: false,
-        message: "Product name, category, and order type are required.",
+        message: "Product name, category and order type are required.",
       });
     }
 
-    // ========= Parse variants =========
-    let parsedVariants = [];
-    if (variants) {
-      parsedVariants =
-        typeof variants === "string" ? JSON.parse(variants) : variants;
-    }
+    // 🧠 Convert booleans from "true"/"false" strings (FormData)
+    const isCakeBool = isCake === "true" || isCake === true;
+    const isNewestBool = isNewest === "true" || isNewest === true;
+    const isActiveBool = isActive === "false" ? false : true; // default true
 
-    // ========= Handle uploaded images =========
+    // 2️⃣ IMAGES (from multer)
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
-      imageUrls = req.files.map((file) => {
-        return `/uploads/products/${file.filename}`;
-      });
+      imageUrls = req.files.map((file) => `/uploads/products/${file.filename}`);
     }
 
-    // ========= Create product =========
+    // 3️⃣ careInstructions (array of strings)
+    let parsedCare = [];
+    if (careInstructions) {
+      parsedCare =
+        typeof careInstructions === "string"
+          ? JSON.parse(careInstructions)
+          : careInstructions;
+    }
+
+    // 5️⃣ CAKE VARIANTS
+    let parsedVariants = [];
+    let parsedSimplePrice = null;
+
+    if (isCakeBool) {
+      if (!variants) {
+        return res.status(400).json({
+          success: false,
+          message: "Variants are required for cake products.",
+        });
+      }
+
+      parsedVariants =
+        typeof variants === "string" ? JSON.parse(variants) : variants;
+
+      // Basic structure validation
+      for (const variant of parsedVariants) {
+        if (!variant.flavour || !Array.isArray(variant.options)) {
+          return res.status(400).json({
+            success: false,
+            message: "Each variant must contain flavour and options[].",
+          });
+        }
+
+        for (const opt of variant.options) {
+          if (!opt.weight || opt.regularPrice == null) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "Each option must have weight and regularPrice for cake products.",
+            });
+          }
+        }
+      }
+    } else {
+      // 6️⃣ NON-CAKE PRICE (simplePrice)
+      if (!simplePrice) {
+        return res.status(400).json({
+          success: false,
+          message: "simplePrice is required for non-cake products.",
+        });
+      }
+
+      parsedSimplePrice =
+        typeof simplePrice === "string" ? JSON.parse(simplePrice) : simplePrice;
+
+      if (parsedSimplePrice.regularPrice == null) {
+        return res.status(400).json({
+          success: false,
+          message: "simplePrice.regularPrice is required.",
+        });
+      }
+    }
+
+    // 7️⃣ CREATE PRODUCT (all payloads included)
     const product = await Product.create({
       productName,
       description,
       categoryId,
       collectionId,
       orderType,
-      variants: parsedVariants,
-      careInstructions,
-      manufactureDetails,
+      isCake: isCakeBool,
+
       images: imageUrls,
-      isCake,
-      isNewest,
-      isActive,
+
+      variants: isCakeBool ? parsedVariants : [],
+      simplePrice: isCakeBool ? null : parsedSimplePrice,
+
+      careInstructions: parsedCare,
+
+      isNewest: isNewestBool,
+      isActive: isActiveBool,
       dietaryType,
     });
 
-    return sendSuccess(res, product, "Product added successfully", 201);
+    return res.status(201).json({
+      success: true,
+      message: "Product added successfully",
+      data: product,
+    });
   },
-
 
   async productList(req, res) {
     const { categoryId, collectionId } = req.body;
@@ -118,23 +185,37 @@ export const productController = {
     if (categoryId) filter.categoryId = categoryId;
     else if (collectionId) filter.collectionId = collectionId;
 
-    // Fetch products
     const products = await Product.find(filter)
       .sort({ createdAt: -1 })
       .populate("categoryId", "name")
       .populate("collectionId", "name");
 
-    // Format response data
     const formattedProducts = products.map((p) => {
-      const firstVariant = p.variants?.[0];
-      const firstPrice = firstVariant
-        ? { regularPrice: firstVariant.regularPrice, egglessPrice: firstVariant.egglessPrice }
-        : null;
+      // 1️⃣ CAKE PRODUCT → get first available option
+      const firstCakeVariant = p.variants?.[0]?.options?.[0];
+
+      // 2️⃣ NON-CAKE PRODUCT
+      const simplePrice = p.simplePrice || null;
+
+      const image = p.images?.[0] || null;
+
+      const price = firstCakeVariant
+        ? {
+          regularPrice: firstCakeVariant.regularPrice,
+          egglessPrice: firstCakeVariant.egglessPrice,
+        }
+        : simplePrice
+          ? {
+            regularPrice: simplePrice.regularPrice,
+            egglessPrice: simplePrice.egglessPrice || null,
+          }
+          : null;
 
       return {
         productId: p._id,
         productName: p.productName,
-        image: p.images?.[0] || null, // ✅ first image
+        image,
+        price,
         ...(categoryId
           ? {
             categoryId: p.categoryId?._id,
@@ -144,7 +225,6 @@ export const productController = {
             collectionId: p.collectionId?._id,
             collectionName: p.collectionId?.name || "",
           }),
-        price: firstPrice,
       };
     });
 
@@ -155,71 +235,121 @@ export const productController = {
     const { productId } = req.params;
 
     const product = await Product.findOne({ _id: productId, isActive: true })
-      // .select("-flavours -weights")
       .populate({
         path: "variants.flavour",
-        model: "Flavour",
-        select: "name"
+        select: "name",
       })
       .populate({
-        path: "variants.weight",
-        model: "Weight",
-        select: "label"
-      })
+        path: "variants.options.weight",
+        select: "label",
+      });
 
     if (!product) {
       return sendSuccess(res, {}, "Product not found");
     }
 
-    const formattedProduct = {
-      ...product.toObject(),
-      variants: product.variants.map((v) => ({
-        flavour: v.flavour?.name || null,
-        weight: v.weight?.label || null,
-        regularPrice: v.regularPrice,
-        egglessPrice: v.egglessPrice,
+    // ---------------- 🟢 FORMAT CAKE VARIANTS
+    const formattedVariants = product.variants?.map((v) => ({
+      flavour: v.flavour?.name || null,
+      options: v.options?.map((opt) => ({
+        weight: opt.weight?.label || null,
+        regularPrice: opt.regularPrice,
+        egglessPrice: opt.egglessPrice,
       })),
+    }));
+
+    // ---------------- 🟣 NON CAKE
+    const simplePrice = product.simplePrice
+      ? {
+        regularPrice: product.simplePrice.regularPrice,
+        egglessPrice: product.simplePrice.egglessPrice || null,
+      }
+      : null;
+
+    // ---------------- FORMAT RESPONSE
+    const formattedProduct = {
+      productId: product._id,
+      productName: product.productName,
+      description: product.description,
+      category: product.categoryId,
+      collection: product.collectionId,
+      orderType: product.orderType,
+      images: product.images,
+      isCake: product.isCake,
+      variants: formattedVariants,
+      simplePrice,
+      careInstructions: product.careInstructions || [],
+      dietaryType: product.dietaryType,
+      isNewest: product.isNewest,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
     };
 
-    return sendSuccess(res, formattedProduct, "Product details fetched successfully");
+    return sendSuccess(
+      res,
+      formattedProduct,
+      "Product details fetched successfully"
+    );
   },
 
 
   async randomProductList(req, res) {
     const allCollections = await Collection.find({ isActive: true });
 
-    if (allCollections.length === 0) {
+    if (!allCollections.length) {
       return sendSuccess(res, [], "No active collections found");
     }
 
+    // Shuffle collections
     const shuffled = allCollections.sort(() => 0.5 - Math.random());
     const selectedCollections = shuffled.slice(0, 2);
 
     const data = await Promise.all(
       selectedCollections.map(async (collection) => {
+        // ====================== SAMPLE PRODUCTS ======================
         const products = await Product.aggregate([
-          { $match: { collectionId: collection._id, isActive: true } },
+          {
+            $match: {
+              collectionId: collection._id,
+              isActive: true,
+            },
+          },
           { $sample: { size: 10 } },
           {
             $project: {
               productId: "$_id",
               productName: 1,
               images: 1,
-              variants: { $slice: ["$variants", 1] }, // only first variant
+              isCake: 1,
+              variants: 1,
+              simplePrice: 1,
             },
           },
         ]);
 
-        // If collection has no products, add placeholder empty products array
+        // ====================== FORMAT PRODUCTS ======================
         const formattedProducts = products.map((p) => {
-          const v = p.variants?.[0];
+          // CAKE: first variant + first weight option
+          const firstVariant = p.variants?.[0];
+          const firstOption = firstVariant?.options?.[0];
+
+          const price = firstOption
+            ? {
+              regularPrice: firstOption.regularPrice,
+              egglessPrice: firstOption.egglessPrice,
+            }
+            : p.simplePrice
+              ? {
+                regularPrice: p.simplePrice.regularPrice,
+                egglessPrice: p.simplePrice.egglessPrice || null,
+              }
+              : null;
+
           return {
             productId: p.productId,
             productName: p.productName,
             image: p.images?.[0] || null,
-            price: v
-              ? { regularPrice: v.regularPrice, egglessPrice: v.egglessPrice }
-              : null,
+            price,
           };
         });
 
@@ -231,17 +361,21 @@ export const productController = {
         };
       })
     );
-    return sendSuccess(res, data, "Random product collections fetched successfully");
+
+    return sendSuccess(
+      res,
+      data,
+      "Random product collections fetched successfully"
+    );
   },
 
 
   async allProductList(req, res) {
-    // Fetch all active products
     const products = await Product.find({ isActive: true })
       .sort({ createdAt: -1 })
       .populate("categoryId", "name")
       .populate("collectionId", "name")
-      .select("productName categoryId collectionId images isNewest"); // ✅ added images
+      .select("productName categoryId collectionId images isNewest");
 
     // Format response
     const formattedProducts = products.map((p) => ({
