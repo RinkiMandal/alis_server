@@ -1,6 +1,5 @@
 import express from 'express'
 import cors from 'cors'
-import cookieParser from 'cookie-parser'
 import dotenv from 'dotenv'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
@@ -19,11 +18,15 @@ const app = express()
 app.use(helmet())
 
 app.use(cors({
-  origin: "http://localhost:5173" || "https://cake-store-31id.vercel.app/",
-  optionsSuccessStatus: 200,
+  origin: [
+    "http://localhost:5173",
+    "https://aliscakesandbakes.in",
+    "https://www.aliscakesandbakes.in",
+    "https://api.aliscakesandbakes.in"
+  ],
   credentials: true,
-  methods: 'GET, POST, PUT, DELETE, PATCH'
-}))
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+}));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -32,7 +35,6 @@ const limiter = rateLimit({
 })
 
 app.use(limiter)
-app.use(cookieParser())
 app.use(express.json())
 
 connectToMongo()

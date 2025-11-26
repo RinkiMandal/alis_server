@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // const mongoUrl = process.env.DB_URL;
-const mongoUrl ='mongodb://localhost:27017/cakedata'
+const mongoUrl ='mongodb://root:Ali_serverNewDbPass2@127.0.0.1:27017/mydb?authSource=admin'
 
 
 export const connectToMongo = async () => {
