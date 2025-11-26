@@ -39,7 +39,7 @@ app.use(express.json())
 
 connectToMongo()
 
-app.use('/uploads', express.static('uploads'))
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const routesPath = path.join(__dirname, 'routes')
 fs.readdirSync(routesPath).forEach(async (file) => {

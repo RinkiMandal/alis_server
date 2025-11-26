@@ -10,38 +10,43 @@ const request_param = multer();
 
 
 router.post(
-    '/admin/flavour-add',
-    request_param.any(),
-    Authentication.admin(),
-    AsyncError(productController.flavourAdd)
+  '/admin/flavour-add',
+  request_param.any(),
+  Authentication.admin(),
+  AsyncError(productController.flavourAdd)
 );
 
 router.post(
-    '/admin/weight-add',
-    request_param.any(),
-    Authentication.admin(),
-    AsyncError(productController.weightAdd)
+  '/admin/weight-add',
+  request_param.any(),
+  Authentication.admin(),
+  AsyncError(productController.weightAdd)
 );
 
 router.get(
-    '/admin/flavour-list',
-    Authentication.admin(),
-    AsyncError(productController.flavourList)
+  '/admin/flavour-list',
+  Authentication.admin(),
+  AsyncError(productController.flavourList)
 );
 
 router.get(
-    '/admin/weight-list',
-    Authentication.admin(),
-    AsyncError(productController.weightList)
-); 
+  '/admin/weight-list',
+  Authentication.admin(),
+  AsyncError(productController.weightList)
+);
 
 
 router.post(
   "/admin/product-add",
-  upload.any(), // up to 6 images
-  Authentication.admin(),
+  Authentication.admin(),               // auth BEFORE upload
+  (req, res, next) => {
+    req.uploadFolder = "products";      // dynamic folder
+    next();
+  },
+  upload.array("images", 3),            // max 3 files
   AsyncError(productController.addProduct)
 );
+
 
 router.post(
   "/user/product-list",

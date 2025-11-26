@@ -66,7 +66,7 @@ export const productController = {
       dietaryType,
     } = req.body;
 
-    // ✅ Validation
+    // ========= Validation =========
     if (!productName || !categoryId || !orderType) {
       return res.status(400).json({
         success: false,
@@ -74,20 +74,22 @@ export const productController = {
       });
     }
 
-    // ✅ Parse variants (sent as JSON string in multipart form-data)
+    // ========= Parse variants =========
     let parsedVariants = [];
     if (variants) {
       parsedVariants =
         typeof variants === "string" ? JSON.parse(variants) : variants;
     }
 
-    // ✅ Handle image uploads (via multer)
+    // ========= Handle uploaded images =========
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
-      imageUrls = req.files.map((file) => saveFile(file, "products"));
+      imageUrls = req.files.map((file) => {
+        return `/uploads/products/${file.filename}`;
+      });
     }
 
-    // ✅ Create product document
+    // ========= Create product =========
     const product = await Product.create({
       productName,
       description,
@@ -106,6 +108,7 @@ export const productController = {
 
     return sendSuccess(res, product, "Product added successfully", 201);
   },
+
 
   async productList(req, res) {
     const { categoryId, collectionId } = req.body;
@@ -137,7 +140,7 @@ export const productController = {
             categoryId: p.categoryId?._id,
             categoryName: p.categoryId?.name || "",
           }
-        : {
+          : {
             collectionId: p.collectionId?._id,
             collectionName: p.collectionId?.name || "",
           }),
@@ -182,76 +185,76 @@ export const productController = {
   },
 
 
-async randomProductList(req, res) {
-  const allCollections = await Collection.find({ isActive: true });
+  async randomProductList(req, res) {
+    const allCollections = await Collection.find({ isActive: true });
 
-  if (allCollections.length === 0) {
-    return sendSuccess(res, [], "No active collections found");
-  }
+    if (allCollections.length === 0) {
+      return sendSuccess(res, [], "No active collections found");
+    }
 
-  const shuffled = allCollections.sort(() => 0.5 - Math.random());
-  const selectedCollections = shuffled.slice(0, 2);
+    const shuffled = allCollections.sort(() => 0.5 - Math.random());
+    const selectedCollections = shuffled.slice(0, 2);
 
-  const data = await Promise.all(
-    selectedCollections.map(async (collection) => {
-      const products = await Product.aggregate([
-        { $match: { collectionId: collection._id, isActive: true } },
-        { $sample: { size: 10 } },
-        {
-          $project: {
-            productId: "$_id",
-            productName: 1,
-            images: 1,
-            variants: { $slice: ["$variants", 1] }, // only first variant
+    const data = await Promise.all(
+      selectedCollections.map(async (collection) => {
+        const products = await Product.aggregate([
+          { $match: { collectionId: collection._id, isActive: true } },
+          { $sample: { size: 10 } },
+          {
+            $project: {
+              productId: "$_id",
+              productName: 1,
+              images: 1,
+              variants: { $slice: ["$variants", 1] }, // only first variant
+            },
           },
-        },
-      ]);
+        ]);
 
-      // If collection has no products, add placeholder empty products array
-      const formattedProducts = products.map((p) => {
-        const v = p.variants?.[0];
+        // If collection has no products, add placeholder empty products array
+        const formattedProducts = products.map((p) => {
+          const v = p.variants?.[0];
+          return {
+            productId: p.productId,
+            productName: p.productName,
+            image: p.images?.[0] || null,
+            price: v
+              ? { regularPrice: v.regularPrice, egglessPrice: v.egglessPrice }
+              : null,
+          };
+        });
+
         return {
-          productId: p.productId,
-          productName: p.productName,
-          image: p.images?.[0] || null,
-          price: v
-            ? { regularPrice: v.regularPrice, egglessPrice: v.egglessPrice }
-            : null,
+          collectionId: collection._id,
+          collectionName: collection.name,
+          description: collection.description || "",
+          products: formattedProducts,
         };
-      });
-
-      return {
-        collectionId: collection._id,
-        collectionName: collection.name,
-        description: collection.description || "",
-        products: formattedProducts,
-      };
-    })
-  );
-  return sendSuccess(res, data, "Random product collections fetched successfully");
-},
+      })
+    );
+    return sendSuccess(res, data, "Random product collections fetched successfully");
+  },
 
 
   async allProductList(req, res) {
-  // Fetch all active products
-  const products = await Product.find({ isActive: true })
-    .sort({ createdAt: -1 })
-    .populate("categoryId", "name")
-    .populate("collectionId", "name")
-    .select("productName categoryId collectionId images isNewest"); // ✅ added images
+    // Fetch all active products
+    const products = await Product.find({ isActive: true })
+      .sort({ createdAt: -1 })
+      .populate("categoryId", "name")
+      .populate("collectionId", "name")
+      .select("productName categoryId collectionId images isNewest"); // ✅ added images
 
-  // Format response
-  const formattedProducts = products.map((p) => ({
-    productId: p._id,
-    isNewest: p.isNewest,
-    productName: p.productName,
-    image: p.images?.[0] || null, 
-    categoryName: p.categoryId?.name || "Uncategorized",
-    collectionName: p.collectionId?.name || "Unassigned",
-  }));
+    // Format response
+    const formattedProducts = products.map((p) => ({
+      productId: p._id,
+      isNewest: p.isNewest,
+      productName: p.productName,
+      image: p.images?.[0] || null,
+      categoryName: p.categoryId?.name || "Uncategorized",
+      collectionName: p.collectionId?.name || "Unassigned",
+    }));
 
-  return sendSuccess(res, formattedProducts, "All product list fetched successfully");
-}
+    return sendSuccess(res, formattedProducts, "All product list fetched successfully");
+  }
 
 
 
