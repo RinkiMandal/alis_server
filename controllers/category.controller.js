@@ -1,7 +1,6 @@
 import { sendSuccess } from "../middleware/responseHandler.js";
 import { Category } from "../models/category.model.js";
 import { Collection } from "../models/collection.model.js";
-import { saveFile } from "../services/fileUploadService.js";
 
 export const CategoryController = {
   async categoryAdd(req, res) {
@@ -14,15 +13,16 @@ export const CategoryController = {
       });
     }
 
-    let image = "";
-    if (req.files && req.files.length > 0) {
-      image = saveFile(req.files[0], "categories"); // Save locally for now
+    let imageUrl = "";
+    if (req.file) {
+      imageUrl = `/uploads/categories/${req.file.filename}`;
     }
+
 
     const data = await Category.create({
       name,
       description,
-      image, // local path, e.g. /uploads/categories/image-123.png
+      image: imageUrl,
     });
 
     return sendSuccess(res, data, "Category added successfully", 201);

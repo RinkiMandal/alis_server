@@ -2,7 +2,6 @@ import { sendSuccess } from "../middleware/responseHandler.js";
 import { Collection } from "../models/collection.model.js";
 import { Product } from "../models/product.modle.js";
 import { Flavour, Weight } from "../models/ProductAttribute.model.js";
-import { saveFile } from "../services/fileUploadService.js";
 
 export const productController = {
 

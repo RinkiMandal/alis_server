@@ -9,10 +9,16 @@ const request_param = multer();
 
 router.post(
   "/admin/category-add",
-  upload.any(),
   Authentication.admin(),
+  (req, res, next) => {
+    req.uploadFolder = "categories";
+    next();
+  },
+  upload.single("image"),
   AsyncError(CategoryController.categoryAdd)
 );
+
+
 
 router.get(
   "/admin/category-list",
@@ -28,9 +34,9 @@ router.post(
 );
 
 router.get(
-    '/admin/collection',
-    Authentication.admin(),
-    AsyncError(CategoryController.collectionList)
+  '/admin/collection',
+  Authentication.admin(),
+  AsyncError(CategoryController.collectionList)
 );
 
 router.get(
