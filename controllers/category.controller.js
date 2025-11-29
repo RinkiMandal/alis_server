@@ -3,14 +3,15 @@ import { Category } from "../models/category.model.js";
 import { Collection } from "../models/collection.model.js";
 
 export const CategoryController = {
-  async categoryAdd(req, res) {
+
+  // category controllers
+  categoryAdd: AsyncError(async (req, res) => {
     const { name, description } = req.body;
 
     if (!name) {
-      return res.status(400).send({
-        success: false,
-        message: "Name is required",
-      });
+      const err = new Error("name is required");
+      err.statusCode = 400;
+      throw err;
     }
 
     let imageUrl = "";
@@ -18,64 +19,108 @@ export const CategoryController = {
       imageUrl = `/uploads/categories/${req.file.filename}`;
     }
 
-
-    const data = await Category.create({
+    await Category.create({
       name,
       description,
       image: imageUrl,
     });
 
-    return sendSuccess(res, data, "Category added successfully", 201);
-  },
+    return sendSuccess(res, {}, "Category added successfully", 201);
+  }),
 
-  async categoryList(req, res) {
+  categoryList: AsyncError(async (req, res) => {
     const categories = await Category.find({ isActive: true }).sort({
       createdAt: -1,
     });
     if (!categories) {
-      return sendSuccess(res, [], "Category list fetched successfully");
+      const err = new Error("categories not found");
+      err.statusCode = 404;
+      throw err;
     }
     return sendSuccess(res, categories, "Category list fetched successfully");
-  },
+  }),
 
-  async adminCategoryList(req, res) {
+  adminCategoryList: AsyncError(async (req, res) => {
     const categories = await Category.find().sort({
       createdAt: -1,
     });
     if (!categories) {
-      return sendSuccess(res, [], "Category list fetched successfully");
+      const err = new Error("categories not found");
+      err.statusCode = 404;
+      throw err;
     }
     return sendSuccess(res, categories, "Category list fetched successfully");
-  },
+  }),
 
-  async collectionAdd(req, res) {
+  categoryUpdate: AsyncError(async (req, res) => {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    const updated = await Category.findByIdAndUpdate(
+      id,
+      { isActive },
+      { new: true }
+    );
+
+    if (!updated) {
+      const err = new Error("Category not found");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    return sendSuccess(res, updated, "Status updated successfully");
+  }),
+
+
+  // Collection Controllers
+  collectionAdd: AsyncError(async (req, res) => {
     const { name, description } = req.body;
 
     if (!name) {
-      return res.status(400).send({
-        success: false,
-        message: "Name is required",
-      });
+      const err = new Error("name is required");
+      err.statusCode = 400;
+      throw err;
     }
 
-    const data = await Collection.create({ name, description });
-    return sendSuccess(res, data, "Collection added successfully", 201);
-  },
+    await Collection.create({ name, description });
+    return sendSuccess(res, {}, "Collection added successfully", 201);
+  }),
 
-  async collectionList(req, res) {
+  collectionList: AsyncError(async (req, res) => {
     const categories = await Collection.find({ isActive: true }).sort({
       createdAt: -1,
     });
     return sendSuccess(res, categories, "Collection list fetched successfully");
-  },
+  }),
 
-  async adminCollectionList(req, res) {
+  adminCollectionList: AsyncError(async (req, res) => {
     const categories = await Collection.find().sort({
       createdAt: -1,
     });
     return sendSuccess(res, categories, "Collection list fetched successfully");
-  },
+  }),
 
+  collectionUpdate: AsyncError(async (req, res) => {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    const updated = await Collection.findByIdAndUpdate(
+      id,
+      { isActive },
+      { new: true }
+    );
+
+    if (!updated) {
+      const err = new Error("Collection not found");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    return sendSuccess(res, updated, "Status updated successfully");
+  }),
+
+
+  // delete controllers
 
   categoryDelete: AsyncError(async (req, res) => {
     const { id } = req.params;
@@ -99,44 +144,6 @@ export const CategoryController = {
       throw err;
     }
     return sendSuccess(res, {}, "Collection deleted successfully", 201);
-  }),
-
-  collectionUpdate: AsyncError(async (req, res) => {
-    const { id } = req.params;
-    const { isActive } = req.body;
-
-    const updated = await Collection.findByIdAndUpdate(
-      id,
-      { isActive },
-      { new: true }
-    );
-
-    if (!updated) {
-      const err = new Error("Collection not found");
-      err.statusCode = 404;
-      throw err;
-    }
-
-    return sendSuccess(res, updated, "Status updated successfully");
-  }),
-
-  categoryUpdate: AsyncError(async (req, res) => {
-    const { id } = req.params;
-    const { isActive } = req.body;
-
-    const updated = await Category.findByIdAndUpdate(
-      id,
-      { isActive },
-      { new: true }
-    );
-
-    if (!updated) {
-      const err = new Error("Category not found");
-      err.statusCode = 404;
-      throw err;
-    }
-
-    return sendSuccess(res, updated, "Status updated successfully");
   }),
 
 

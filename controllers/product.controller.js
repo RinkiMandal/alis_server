@@ -5,52 +5,57 @@ import { Flavour, Weight } from "../models/ProductAttribute.model.js";
 
 export const productController = {
 
-  async flavourAdd(req, res) {
+  flavourAdd: AsyncError(async (req, res) => {
     const { name } = req.body;
 
     if (!name) {
-      return res.status(400).send({
-        success: false,
-        message: "Name is required",
-      });
+      const err = new Error("name is required");
+      err.statusCode = 400;
+      throw err;
     }
 
-    const data = await Flavour.create(req.body);
-    return sendSuccess(res, data, "Flavour added successfully", 201);
-  },
+    await Flavour.create(req.body);
+    return sendSuccess(res, {}, "Flavour added successfully", 201);
+  }),
 
-  async weightAdd(req, res) {
+  flavourList: AsyncError(async (req, res) => {
+    const flavour = await Flavour.find({ isActive: true }).sort({ createdAt: -1 });
+    if (!flavour) {
+      const err = new Error("Flavour not found");
+      err.statusCode = 404;
+      throw err;
+    }
+    return sendSuccess(res, flavour, "flavour list fetched successfully");
+  }),
+
+  weightAdd: AsyncError(async (req, res) => {
     const { label } = req.body;
 
     if (!label) {
-      return res.status(400).send({
-        success: false,
-        message: "label is required",
-      });
+      const err = new Error("label is required");
+      err.statusCode = 400;
+      throw err;
     }
 
-    const data = await Weight.create(req.body);
-    return sendSuccess(res, data, "weight added successfully", 201);
-  },
+    await Weight.create(req.body);
+    return sendSuccess(res, {}, "weight added successfully", 201);
+  }),
 
-  async flavourList(req, res) {
-    const flavour = await Flavour.find({ isActive: true }).sort({ createdAt: -1 });
-    if (!flavour) {
-      return sendSuccess(res, [], "flavour list fetched successfully");
-    }
-    return sendSuccess(res, flavour, "flavour list fetched successfully");
-  },
-
-  async weightList(req, res) {
+  weightList: AsyncError(async (req, res) => {
     const weight = await Weight.find({ isActive: true }).sort({ createdAt: -1 });
     if (!weight) {
-      return sendSuccess(res, [], "weight list fetched successfully");
+      const err = new Error("not found");
+      err.statusCode = 404;
+      throw err;
     }
     return sendSuccess(res, weight, "weight list fetched successfully");
-  },
+  }),
 
-  // controller method
-  async addProduct(req, res) {
+
+
+
+  // Product Controllers
+  addProduct: AsyncError(async (req, res) => {
     const {
       productName,
       description,
@@ -68,10 +73,10 @@ export const productController = {
 
     // 1️⃣ BASIC REQUIRED FIELDS
     if (!productName || !categoryId || !orderType) {
-      return res.status(400).json({
-        success: false,
-        message: "Product name, category and order type are required.",
-      });
+
+      const err = new Error("Product name, category and order type are required.");
+      err.statusCode = 400;
+      throw err;
     }
 
     // 🧠 Convert booleans from "true"/"false" strings (FormData)
@@ -100,10 +105,9 @@ export const productController = {
 
     if (isCakeBool) {
       if (!variants) {
-        return res.status(400).json({
-          success: false,
-          message: "Variants are required for cake products.",
-        });
+        const err = new Error("Variants are required for cake products.");
+        err.statusCode = 400;
+        throw err;
       }
 
       parsedVariants =
@@ -112,44 +116,40 @@ export const productController = {
       // Basic structure validation
       for (const variant of parsedVariants) {
         if (!variant.flavour || !Array.isArray(variant.options)) {
-          return res.status(400).json({
-            success: false,
-            message: "Each variant must contain flavour and options[].",
-          });
+
+          const err = new Error("Each variant must contain flavour and options");
+          err.statusCode = 400;
+          throw err;
         }
 
         for (const opt of variant.options) {
           if (!opt.weight || opt.regularPrice == null) {
-            return res.status(400).json({
-              success: false,
-              message:
-                "Each option must have weight and regularPrice for cake products.",
-            });
+            const err = new Error("Each option must have weight and regularPrice for cake products.");
+            err.statusCode = 400;
+            throw err;
           }
         }
       }
     } else {
       // 6️⃣ NON-CAKE PRICE (simplePrice)
       if (!simplePrice) {
-        return res.status(400).json({
-          success: false,
-          message: "simplePrice is required for non-cake products.",
-        });
+        const err = new Error("simplePrice is required for non-cake products.");
+        err.statusCode = 400;
+        throw err;
       }
 
       parsedSimplePrice =
         typeof simplePrice === "string" ? JSON.parse(simplePrice) : simplePrice;
 
       if (parsedSimplePrice.regularPrice == null) {
-        return res.status(400).json({
-          success: false,
-          message: "simplePrice.regularPrice is required.",
-        });
+        const err = new Error("regularPrice is required.");
+        err.statusCode = 400;
+        throw err;
       }
     }
 
     // 7️⃣ CREATE PRODUCT (all payloads included)
-    const product = await Product.create({
+    await Product.create({
       productName,
       description,
       categoryId,
@@ -169,17 +169,12 @@ export const productController = {
       dietaryType,
     });
 
-    return res.status(201).json({
-      success: true,
-      message: "Product added successfully",
-      data: product,
-    });
-  },
+    return sendSuccess(res, {}, "Product added successfully", 201);
+  }),
 
-  async productList(req, res) {
+  productList: AsyncError(async (req, res) => {
     const { categoryId, collectionId } = req.body;
 
-    // Build query dynamically
     const filter = { isActive: true };
     if (categoryId) filter.categoryId = categoryId;
     else if (collectionId) filter.collectionId = collectionId;
@@ -228,9 +223,9 @@ export const productController = {
     });
 
     return sendSuccess(res, formattedProducts, "Product list fetched successfully");
-  },
+  }),
 
-  async productDetail(req, res) {
+  productDetail: AsyncError(async (req, res) => {
     const { productId } = req.params;
 
     const product = await Product.findOne({ _id: productId, isActive: true })
@@ -247,7 +242,7 @@ export const productController = {
       return sendSuccess(res, {}, "Product not found");
     }
 
-    // ---------------- 🟢 FORMAT CAKE VARIANTS
+    // FORMAT CAKE VARIANTS
     const formattedVariants = product.variants?.map((v) => ({
       flavour: v.flavour?.name || null,
       options: v.options?.map((opt) => ({
@@ -257,7 +252,7 @@ export const productController = {
       })),
     }));
 
-    // ---------------- 🟣 NON CAKE
+    //  NON CAKE
     const simplePrice = product.simplePrice
       ? {
         regularPrice: product.simplePrice.regularPrice,
@@ -265,7 +260,6 @@ export const productController = {
       }
       : null;
 
-    // ---------------- FORMAT RESPONSE
     const formattedProduct = {
       productId: product._id,
       productName: product.productName,
@@ -289,23 +283,20 @@ export const productController = {
       formattedProduct,
       "Product details fetched successfully"
     );
-  },
+  }),
 
-
-  async randomProductList(req, res) {
+  randomProductList: AsyncError(async (req, res) => {
     const allCollections = await Collection.find({ isActive: true });
 
     if (!allCollections.length) {
       return sendSuccess(res, [], "No active collections found");
     }
 
-    // Shuffle collections
     const shuffled = allCollections.sort(() => 0.5 - Math.random());
     const selectedCollections = shuffled.slice(0, 2);
 
     const data = await Promise.all(
       selectedCollections.map(async (collection) => {
-        // ====================== SAMPLE PRODUCTS ======================
         const products = await Product.aggregate([
           {
             $match: {
@@ -326,9 +317,7 @@ export const productController = {
           },
         ]);
 
-        // ====================== FORMAT PRODUCTS ======================
         const formattedProducts = products.map((p) => {
-          // CAKE: first variant + first weight option
           const firstVariant = p.variants?.[0];
           const firstOption = firstVariant?.options?.[0];
 
@@ -366,16 +355,15 @@ export const productController = {
       data,
       "Random product collections fetched successfully"
     );
-  },
+  }),
 
-  async allProductList(req, res) {
+  allProductList: AsyncError(async (req, res) => {
     const products = await Product.find({ isActive: true })
       .sort({ createdAt: -1 })
       .populate("categoryId", "name")
       .populate("collectionId", "name")
       .select("productName categoryId collectionId images isNewest");
 
-    // Format response
     const formattedProducts = products.map((p) => ({
       productId: p._id,
       isNewest: p.isNewest,
@@ -386,7 +374,7 @@ export const productController = {
     }));
 
     return sendSuccess(res, formattedProducts, "All product list fetched successfully");
-  },
+  }),
 
   productDelete: AsyncError(async (req, res) => {
     const { productId } = req.params;

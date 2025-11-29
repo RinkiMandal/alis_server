@@ -1,17 +1,18 @@
 import { User } from "../models/user.model.js";
 import jwt from "jsonwebtoken";
-import { sendSuccess } from "../middleware/responseHandler.js";
+import { AsyncError, sendSuccess } from "../middleware/responseHandler.js";
 import { sendOTP } from "../utility/sendOTP.js";
 
 export const UserController = {
-  async registerNewUser(req, res) {
+
+
+  registerNewUser: AsyncError(async (req, res) => {
     const { email, name, mobile } = req.body;
 
     if (!name || !mobile) {
-      return res.status(400).send({
-        success: false,
-        message: "Name and Mobile are required",
-      });
+      const err = new Error("name and mobile are required");
+      err.statusCode = 404;
+      throw err;
     }
 
     // Check existing user
@@ -45,11 +46,9 @@ export const UserController = {
           200
         );
       }
-
-      return res.status(400).send({
-        success: false,
-        message: "User already exists.",
-      });
+      const err = new Error("User already exists.");
+      err.statusCode = 400;
+      throw err;
     }
 
     // const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -83,25 +82,23 @@ export const UserController = {
       "OTP sent successfully. Please verify to complete registration.",
       201
     );
-  },
+  }),
 
-  async login(req, res) {
+  login: AsyncError(async (req, res) => {
     const { mobile } = req.body;
 
     if (!mobile) {
-      return res.status(400).send({
-        success: false,
-        message: "Mobile number is required",
-      });
+      const err = new Error("number is required");
+      err.statusCode = 400;
+      throw err;
     }
 
     const userInfo = await User.findOne({ mobile: mobile.trim() });
 
     if (!userInfo) {
-      return res.status(404).send({
-        success: false,
-        message: "User not found. Please register first.",
-      });
+      const err = new Error("user not found! please register first");
+      err.statusCode = 404;
+      throw err;
     }
     const otp = "1234";
     // const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -128,48 +125,44 @@ export const UserController = {
       "OTP sent successfully. Please verify to login.",
       201
     );
-  },
+  }),
 
-  async verifyOTP(req, res) {
+  verifyOTP: AsyncError(async (req, res) => {
     const { otp, otp_token } = req.body;
 
     if (!otp || !otp_token) {
-      return res.status(400).send({
-        success: false,
-        message: "OTP and OTP token are required",
-      });
+      const err = new Error("OTP is required");
+      err.statusCode = 400;
+      throw err;
     }
 
     // Verify OTP token first
     let decoded;
     try {
       decoded = jwt.verify(otp_token, process.env.JWT_OTP_SECRET);
-    } catch (err) {
-      return res.status(401).send({
-        success: false,
-        message: "Invalid or expired OTP token.",
-      });
+    } catch (e) {
+      const err = new Error("Invalid or expired OTP token");
+      err.statusCode = 401;
+      throw err;
     }
 
     // Find the user by ID from token
     const user = await User.findById(decoded.id);
     if (!user) {
-      return res.status(404).send({
-        success: false,
-        message: "User not found",
-      });
+      const err = new Error("User not found");
+      err.statusCode = 404;
+      throw err;
     }
-    console.log(decoded);
+    // console.log(decoded);
 
     if (
       !decoded.issued_at ||
       !user.otp_token_generated_at ||
       decoded.issued_at < user.otp_token_generated_at.getTime()
     ) {
-      return res.status(401).send({
-        success: false,
-        message: "Old or invalid OTP token. Please request a new OTP.",
-      });
+      const err = new Error(" OTP token has been invalidated. Please request a new OTP.");
+      err.statusCode = 401;
+      throw err;
     }
 
     // Validate OTP
@@ -178,17 +171,15 @@ export const UserController = {
       user.otp_expiry = null;
       await user.save();
 
-      return res.status(400).send({
-        success: false,
-        message: "OTP has expired. Please try again.",
-      });
+      const err = new Error("OTP has expired. Please request a new OTP.");
+      err.statusCode = 400;
+      throw err;
     }
 
     if (user.otp !== otp) {
-      return res.status(400).send({
-        success: false,
-        message: "Invalid OTP. Please try again.",
-      });
+      const err = new Error("Invalid OTP. Please try again.");
+      err.statusCode = 400;
+      throw err;
     }
 
     // Clear OTP
@@ -226,25 +217,23 @@ export const UserController = {
     };
 
     return sendSuccess(res, data, "OTP verified successfully", 201);
-  },
+  }),
 
-  async resendOTP(req, res) {
+  resendOTP: AsyncError(async (req, res) => {
     const { mobile } = req.body;
 
     if (!mobile) {
-      return res.status(400).send({
-        success: false,
-        message: "Mobile number is required",
-      });
+      const err = new Error("number is required");
+      err.statusCode = 400;
+      throw err;
     }
 
     // Find the user
     const user = await User.findOne({ mobile: mobile.trim() });
     if (!user) {
-      return res.status(404).send({
-        success: false,
-        message: "User not found",
-      });
+      const err = new Error("user not found! please register first");
+      err.statusCode = 404;
+      throw err;
     }
 
     // Generate new OTP and expiry
@@ -267,35 +256,32 @@ export const UserController = {
 
     await sendOTP(mobile.trim(), otp);
     return sendSuccess(res, { otp_token }, "OTP sent successfully.", 201);
-  },
+  }),
 
-  async generateAccessTokenFromRefreshToken(req, res) {
+  generateAccessTokenFromRefreshToken: AsyncError(async (req, res) => {
     const { refresh_token } = req.body;
 
     if (!refresh_token) {
-      return res.status(400).send({
-        success: false,
-        message: "Refresh token is required",
-      });
+      const err = new Error("You are unauthorized!");
+      err.statusCode = 400;
+      throw err;
     }
 
     // Find user with this refresh token
     const user = await User.findOne({ refresh_token });
     if (!user) {
-      return res.status(403).send({
-        success: false,
-        message: "Invalid refresh token",
-      });
+      const err = new Error("User not found");
+      err.statusCode = 404;
+      throw err;
     }
 
     // Verify refresh token
     try {
       jwt.verify(refresh_token, process.env.JWT_REFRESH_SECRET);
-    } catch (err) {
-      return res.status(403).send({
-        success: false,
-        message: "Refresh token expired or invalid",
-      });
+    } catch (e) {
+      const err = new Error("Invalid or expired refresh token");
+      err.statusCode = 403;
+      throw err;
     }
 
     user.last_token_generated_at = new Date();
@@ -313,10 +299,10 @@ export const UserController = {
     );
 
     const data = { access_token: accessToken };
-    return sendSuccess(res, data, "Access token generated successfully", 200);
-  },
+    return sendSuccess(res, data, "token generated successfully", 200);
+  }),
 
-  async getProfile(req, res) {
+  getProfile: AsyncError(async (req, res) => {
     const user = await User.findById(req.user.id);
 
     const userInfo = {
@@ -335,9 +321,9 @@ export const UserController = {
       "Profile details fetched successfully",
       200
     );
-  },
+  }),
 
-  async updateProfile(req, res) {
+  updateProfile: AsyncError(async (req, res) => {
     const { name, image } = req.body;
 
     const userInfo = await User.findById(req.user.id);
@@ -351,9 +337,9 @@ export const UserController = {
 
     await userInfo.save();
     return sendSuccess(res, {}, "Profile updated successfully", 201);
-  },
+  }),
 
-  async userList(req, res) {
+  userList: AsyncError(async (req, res) => {
     const user = await User.find().sort({ createdAt: -1 });
 
     const users = user.map((user) => ({
@@ -368,17 +354,17 @@ export const UserController = {
     }));
 
     return sendSuccess(res, users, "User list fetched successfully");
-  },
+  }),
 
-  async userDelete(req, res) {
+  userDelete: AsyncError(async (req, res) => {
     const { id } = req.params;
     await User.findByIdAndDelete(id);
     return sendSuccess(res, {}, "User deleted successfully");
-  },
+  }),
 
-  async userUpdate(req, res) {
+  userUpdate: AsyncError(async (req, res) => {
     const { id } = req.params;
     await User.findByIdAndUpdate(id, req.body, { new: true });
     return sendSuccess(res, {}, "User updated successfully", 201);
-  },
+  }),
 };
