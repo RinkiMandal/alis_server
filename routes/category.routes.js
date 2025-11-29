@@ -18,12 +18,10 @@ router.post(
   AsyncError(CategoryController.categoryAdd)
 );
 
-
-
 router.get(
   "/admin/category-list",
   Authentication.admin(),
-  AsyncError(CategoryController.categoryList)
+  AsyncError(CategoryController.adminCategoryList)
 );
 
 router.post(
@@ -36,7 +34,7 @@ router.post(
 router.get(
   '/admin/collection',
   Authentication.admin(),
-  AsyncError(CategoryController.collectionList)
+  AsyncError(CategoryController.adminCollectionList)
 );
 
 router.get(
@@ -47,6 +45,36 @@ router.get(
 router.get(
   "/user/category-list",
   AsyncError(CategoryController.categoryList)
+);
+
+
+router.put(
+  "/admin/collection-update/:id",
+  Authentication.admin(),
+  AsyncError(CategoryController.collectionUpdate)
+);
+
+router.put(
+  "/admin/category-update/:id",
+  Authentication.admin(),
+  AsyncError(CategoryController.categoryUpdate)
+);
+
+
+
+
+
+// category collection delete routes
+router.delete(
+  "/admin/collection-delete/:id",
+  Authentication.admin(),
+  AsyncError(CategoryController.collectionDelete)
+);
+
+router.delete(
+  "/admin/category-delete/:id",
+  Authentication.admin(),
+  AsyncError(CategoryController.categoryDelete)
 );
 
 export default router;

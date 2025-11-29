@@ -47,6 +47,11 @@ router.post(
   AsyncError(productController.addProduct)
 );
 
+router.delete(
+  "/admin/product-delete/:productId",
+  Authentication.admin(),
+  AsyncError(productController.productDelete)
+);
 
 router.post(
   "/user/product-list",

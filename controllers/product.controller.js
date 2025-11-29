@@ -1,4 +1,4 @@
-import { sendSuccess } from "../middleware/responseHandler.js";
+import { AsyncError, sendSuccess } from "../middleware/responseHandler.js";
 import { Collection } from "../models/collection.model.js";
 import { Product } from "../models/product.modle.js";
 import { Flavour, Weight } from "../models/ProductAttribute.model.js";
@@ -368,7 +368,6 @@ export const productController = {
     );
   },
 
-
   async allProductList(req, res) {
     const products = await Product.find({ isActive: true })
       .sort({ createdAt: -1 })
@@ -382,12 +381,25 @@ export const productController = {
       isNewest: p.isNewest,
       productName: p.productName,
       image: p.images?.[0] || null,
-      categoryName: p.categoryId?.name || "Uncategorized",
-      collectionName: p.collectionId?.name || "Unassigned",
+      categoryName: p.categoryId?.name,
+      collectionName: p.collectionId?.name,
     }));
 
     return sendSuccess(res, formattedProducts, "All product list fetched successfully");
-  }
+  },
+
+  productDelete: AsyncError(async (req, res) => {
+    const { productId } = req.params;
+    const product = await Product.findByIdAndDelete(productId);
+
+    if (!product) {
+      const err = new Error("product not found");
+      err.statusCode = 404;
+      throw err;
+    }
+    return sendSuccess(res, {}, "Product deleted successfully", 201);
+  })
+
 
 
 

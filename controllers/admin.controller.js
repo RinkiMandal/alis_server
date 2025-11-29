@@ -1,17 +1,17 @@
 import bcrypt from "bcrypt";
 import { Admin } from "../models/admin.model.js";
 import jwt from "jsonwebtoken";
-import { sendSuccess } from "../middleware/responseHandler.js";
+import { AsyncError, sendSuccess } from "../middleware/responseHandler.js";
 
 export const AdminController = {
-  async registerAdmin(req, res) {
+
+  registerAdmin: AsyncError(async (req, res) => {
     const { email, password, name } = req.body;
 
     if (!email || !password || !name) {
-      return res.status(400).send({
-        success: false,
-        message: "Name, Password, Email are required",
-      });
+      const err = new Error("Name, Password, Email are required");
+      err.statusCode = 400;
+      throw err;
     }
     const queryArr = [{ email: email.trim() }];
 
@@ -55,35 +55,31 @@ export const AdminController = {
 
     const data = { access_token: accessToken, refresh_token: refreshToken };
     return sendSuccess(res, data, "Admin registered successfully", 201);
-  },
+  }),
 
-  async generateAccessTokenFromRefreshToken(req, res) {
+  generateAccessTokenFromRefreshToken: AsyncError(async (req, res) => {
     const { refresh_token } = req.body;
 
     if (!refresh_token) {
-      return res.status(400).send({
-        success: false,
-        message: "Refresh token is required",
-      });
+      const err = new Error("Refresh token is required");
+      err.statusCode = 400;
+      throw err;
     }
 
-    // Find Admin with this refresh token
     const token = await Admin.findOne({ refresh_token });
     if (!token) {
-      return res.status(403).send({
-        success: false,
-        message: "Invalid refresh token",
-      });
+      const err = new Error("Invalid refresh token");
+      err.statusCode = 403;
+      throw err;
     }
 
     // Verify refresh token
     try {
       jwt.verify(refresh_token, process.env.JWT_REFRESH_SECRET);
-    } catch (err) {
-      return res.status(403).send({
-        success: false,
-        message: "Refresh token expired or invalid",
-      });
+    } catch (e) {
+      const err = new Error("Refresh token expired or invalid");
+      err.statusCode = 403;
+      throw err;
     }
 
     token.last_token_generated_at = new Date();
@@ -102,28 +98,30 @@ export const AdminController = {
 
     const data = { access_token: accessToken };
     return sendSuccess(res, data, "Access token generated successfully", 200);
-  },
+  }),
 
-  async login(req, res) {
+  login: AsyncError(async (req, res) => {
     const { email, password } = req.body;
 
-    if (!email || !password)
-      return res
-        .status(400)
-        .send({ success: false, message: "email and password are required" });
+    if (!email || !password) {
+      const err = new Error("Email and Password are required");
+      err.statusCode = 400;
+      throw err;
+    }
 
     const AdminInfo = await Admin.findOne({ email: email.trim() });
-    if (!AdminInfo)
-      return res
-        .status(404)
-        .send({ success: false, message: "Invalid number or password" });
+    if (!AdminInfo) {
+      const err = new Error("Invalid number or password");
+      err.statusCode = 404;
+      throw err;
+    }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(password, AdminInfo.password);
-    if (!isPasswordValid)
-      return res
-        .status(400)
-        .send({ success: false, message: "Invalid number or password" });
+    if (!isPasswordValid) {
+      const err = new Error("Invalid number or password");
+      err.statusCode = 404;
+      throw err;
+    }
 
     AdminInfo.last_token_generated_at = new Date();
     const payload = {
@@ -151,19 +149,6 @@ export const AdminController = {
 
     const data = { access_token: accessToken, refresh_token: refreshToken };
     return sendSuccess(res, data, "Login successfully", 201);
-  },
+  }),
 
-  async profile(req, res) {
-    const admin = await Admin.findById(req.admin.id);
-
-    const userInfo = {
-      name: admin.name,
-      _id: admin._id,
-      email: admin.email,
-      createdAt: admin.createdAt,
-    };
-
-    return sendSuccess(res, userInfo, "Profile fetched successfully", 200);
-  },
-
-};
+}
